@@ -2,7 +2,8 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { motion } from "framer-motion";
-import { ArrowRight, Calculator, Globe2, Users, Heart, BookOpen, Gavel, CloudSun, Leaf } from "lucide-react";
+import { ArrowRight, Calculator, Globe2, Users, Heart, BookOpen, Gavel, CloudSun, Leaf, Newspaper } from "lucide-react";
+import BissalLogo from "@/components/BissalLogo";
 
 const modules = [
   { icon: Leaf, name: "Consumption Exchange", line: "Waste & water, one chapter", stamp: "GREEN", stampClass: "green" },
@@ -10,6 +11,7 @@ const modules = [
   { icon: Globe2, name: "Currency + Logistics", line: "Real landed cost", stamp: "LIVE", stampClass: "" },
   { icon: BookOpen, name: "Revision", line: "AI summaries & flashcards", stamp: "STUDY", stampClass: "blue" },
   { icon: Gavel, name: "Amendment Wire", line: "RBI · SEBI · GST · IT · MCA", stamp: "LIVE", stampClass: "" },
+  { icon: Newspaper, name: "Educational Blog", line: "Write, attach media, AI digest", stamp: "NEW", stampClass: "" },
   { icon: Heart, name: "Wellness", line: "Medicines + journal & community", stamp: "CARE", stampClass: "green" },
   { icon: CloudSun, name: "Weather Hub", line: "Hyper-local + persona checklists", stamp: "TODAY", stampClass: "blue" },
   { icon: Users, name: "Skill Swap", line: "Trade time, not money", stamp: "OPEN", stampClass: "blue" },
@@ -59,7 +61,8 @@ export default function Landing() {
       {/* Top bar */}
       <header className="border-b border-black">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
+            <BissalLogo size={36} />
             <span className="bissal-mark text-2xl" data-testid="brand-mark">Bissal.</span>
             <span className="font-mono-print text-xs tracking-widest-print uppercase text-neutral-600 hidden sm:inline">
               Problem Solver Hub — Vol. I
@@ -109,8 +112,8 @@ export default function Landing() {
               Est. 2026 — A weekly broadside of practical instruments
             </p>
             <h1 className="font-typewriter text-5xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight">
-              <span className="marker-underline">Eight small chapters</span><br />
-              for <span className="text-[#FF3333]">ten</span> large problems.
+              <span className="marker-underline">Nine small chapters</span><br />
+              for <span className="text-[#FF3333]">eleven</span> large problems.
             </h1>
             <p className="font-mono-print mt-8 max-w-xl text-base leading-relaxed">
               Bissal is a quiet, premium workshop for the messy parts of modern life — waste, water,

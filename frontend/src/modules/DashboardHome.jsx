@@ -4,7 +4,7 @@ import { PageHeader, Section } from "./_shared";
 import { useAuth } from "@/lib/auth";
 import {
   Calculator, Globe2, Users,
-  BookOpen, Gavel, CloudSun, ArrowRight, Heart, Leaf,
+  BookOpen, Gavel, CloudSun, ArrowRight, Heart, Leaf, Newspaper,
 } from "lucide-react";
 
 const items = [
@@ -13,6 +13,7 @@ const items = [
   { to: "/dashboard/currency", icon: Globe2, name: "Currency + Logistics", desc: "Live rates plus customs, freight and landed cost.", stamp: "LIVE" },
   { to: "/dashboard/revision", icon: BookOpen, name: "Revision", desc: "Notes in, summary + table + flashcards out, printable.", stamp: "STUDY" },
   { to: "/dashboard/amendments", icon: Gavel, name: "Amendments", desc: "RBI, SEBI, GST, IT, MCA, ICAI — live notifications wire.", stamp: "LIVE" },
+  { to: "/dashboard/blog", icon: Newspaper, name: "Educational Blog", desc: "Write unlimited blogs with images & video. Press AI to summarise.", stamp: "NEW" },
   { to: "/dashboard/wellness", icon: Heart, name: "Wellness", desc: "Medicine prices + mood journal & anonymous community Q&A.", stamp: "CARE" },
   { to: "/dashboard/weather", icon: CloudSun, name: "Weather", desc: "Hyper-local forecast and role-based daily checklist.", stamp: "TODAY" },
   { to: "/dashboard/skills", icon: Users, name: "Skill Swap", desc: "Offer a skill, receive one — rated by your neighbours.", stamp: "OPEN" },
@@ -23,7 +24,7 @@ export default function DashboardHome() {
   const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
   return (
     <div data-testid="dashboard-home">
-      <PageHeader number="00" title={`Good day, ${user?.name?.split(" ")[0] || "reader"}.`} subtitle={`${today}. Eight chapters await. Pick one and begin.`} />
+      <PageHeader number="00" title={`Good day, ${user?.name?.split(" ")[0] || "reader"}.`} subtitle={`${today}. Nine chapters await. Pick one and begin.`} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {items.map((it, i) => (
           <Link

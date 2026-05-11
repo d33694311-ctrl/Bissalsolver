@@ -3,7 +3,7 @@ import { Routes, Route, NavLink, useNavigate, Link, Navigate } from "react-route
 import { useAuth } from "@/lib/auth";
 import {
   Recycle, Calculator, Globe2, Users,
-  LogOut, LayoutGrid, BookOpen, Gavel, CloudSun, Heart, Leaf,
+  LogOut, LayoutGrid, BookOpen, Gavel, CloudSun, Heart, Leaf, Newspaper,
 } from "lucide-react";
 import ConsumptionExchange from "@/modules/ConsumptionExchange";
 import Wellness from "@/modules/Wellness";
@@ -17,8 +17,10 @@ import Revision from "@/modules/Revision";
 import Amendments from "@/modules/Amendments";
 import Medicines from "@/modules/Medicines";
 import Weather from "@/modules/Weather";
+import Blog from "@/modules/Blog";
 import DashboardHome from "@/modules/DashboardHome";
 import NotificationBell from "@/components/NotificationBell";
+import BissalLogo from "@/components/BissalLogo";
 
 const navItems = [
   { to: "/dashboard", label: "Index", icon: LayoutGrid, end: true, key: "home" },
@@ -27,6 +29,7 @@ const navItems = [
   { to: "/dashboard/currency", label: "Currency", icon: Globe2, key: "currency" },
   { to: "/dashboard/revision", label: "Revision", icon: BookOpen, key: "revision" },
   { to: "/dashboard/amendments", label: "Amendments", icon: Gavel, key: "amendments" },
+  { to: "/dashboard/blog", label: "Educational Blog", icon: Newspaper, key: "blog" },
   { to: "/dashboard/wellness", label: "Wellness", icon: Heart, key: "wellness" },
   { to: "/dashboard/weather", label: "Weather", icon: CloudSun, key: "weather" },
   { to: "/dashboard/skills", label: "Skill Swap", icon: Users, key: "skills" },
@@ -53,7 +56,10 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-black flex-col flex-shrink-0 hidden md:flex sticky top-0 h-screen overflow-y-auto">
         <div className="border-b border-black p-6">
-          <Link to="/" className="bissal-mark text-2xl block" data-testid="sidebar-brand">Bissal.</Link>
+          <Link to="/" className="flex items-center gap-2" data-testid="sidebar-brand">
+            <BissalLogo size={32} />
+            <span className="bissal-mark text-2xl">Bissal.</span>
+          </Link>
           <p className="font-mono-print text-[10px] tracking-widest-print uppercase mt-1 text-neutral-600">Problem Solver Hub</p>
         </div>
         <nav className="flex-1 py-3">
@@ -98,7 +104,10 @@ export default function Dashboard() {
 
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-black z-30 flex items-center justify-between px-4 py-3">
-        <Link to="/" className="bissal-mark text-xl">Bissal.</Link>
+        <Link to="/" className="flex items-center gap-2">
+          <BissalLogo size={26} />
+          <span className="bissal-mark text-xl">Bissal.</span>
+        </Link>
         <div className="flex items-center gap-2">
           <div data-testid="notification-bell-mobile-wrap"><NotificationBell /></div>
           <button onClick={logout} className="font-mono-print text-xs border border-black px-3 py-1" data-testid="mobile-logout">Out</button>
@@ -146,6 +155,7 @@ export default function Dashboard() {
           <Route path="journal" element={<MentalJournal />} />
           <Route path="weather" element={<Weather />} />
           <Route path="skills" element={<SkillSwap />} />
+          <Route path="blog" element={<Blog />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

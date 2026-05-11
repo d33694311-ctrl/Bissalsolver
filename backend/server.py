@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Cookie, Depends, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Cookie, Depends, Header, UploadFile, File, Form, Query
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -8,6 +8,7 @@ import logging
 import io
 import uuid
 import httpx
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -912,6 +913,11 @@ async def _ensure_medicine_seed():
 @app.on_event("startup")
 async def on_startup():
     await _ensure_medicine_seed()
+    try:
+        init_storage()
+        logging.info("Object storage initialised")
+    except Exception as e:
+        logging.warning(f"Storage init failed at startup (will retry on first upload): {e}")
 
 @api_router.get("/medicines/search")
 async def search_medicines(q: Optional[str] = ""):
@@ -1037,7 +1043,203 @@ async def get_reviews(skill_id: str):
     docs = await db.skill_reviews.find({"skill_id": skill_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return docs
 
-# ---------- Mount ----------
+# ---------- Mount (kept here until all routes are declared above) ----------
+
+# ---------- Object Storage Helpers (Emergent) ----------
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+APP_NAME = "bissal"
+_storage_key: Optional[str] = None
+
+def init_storage():
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_LLM_KEY:
+        raise RuntimeError("EMERGENT_LLM_KEY missing")
+    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=300,
+    )
+    if resp.status_code == 403:
+        # Refresh storage key
+        global _storage_key
+        _storage_key = None
+        key = init_storage()
+        resp = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data, timeout=300,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+def get_object(path: str) -> tuple:
+    key = init_storage()
+    resp = requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=120,
+    )
+    if resp.status_code == 403:
+        global _storage_key
+        _storage_key = None
+        key = init_storage()
+        resp = requests.get(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key}, timeout=120,
+        )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+# ---------- Educational Blog ----------
+class BlogMedia(BaseModel):
+    kind: str  # image | video
+    path: str  # storage_path
+    content_type: str
+    original_filename: str
+
+class BlogPostCreate(BaseModel):
+    title: str
+    body: str
+    topic: Optional[str] = ""
+    video_url: Optional[str] = ""  # external embed (YouTube/Vimeo)
+    media: List[BlogMedia] = []
+
+@api_router.post("/blog/upload")
+async def blog_upload(file: UploadFile = File(...), user: User = Depends(get_current_user)):
+    name = file.filename or "file.bin"
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else "bin"
+    ct = file.content_type or "application/octet-stream"
+    kind = "image" if ct.startswith("image/") else ("video" if ct.startswith("video/") else "file")
+    path = f"{APP_NAME}/blog/{user.user_id}/{uuid.uuid4()}.{ext}"
+    data = await file.read()
+    try:
+        result = put_object(path, data, ct)
+    except Exception as e:
+        logging.warning(f"Upload failed: {e}")
+        raise HTTPException(status_code=502, detail="Upload failed. Try again.")
+    await db.blog_files.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "storage_path": result["path"],
+        "original_filename": name,
+        "content_type": ct,
+        "size": result.get("size", len(data)),
+        "kind": kind,
+        "is_deleted": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"path": result["path"], "kind": kind, "content_type": ct, "original_filename": name}
+
+@api_router.get("/blog/file")
+async def blog_file(path: str, session_token: Optional[str] = Cookie(None), auth: Optional[str] = Query(None)):
+    token = session_token or auth
+    if not token:
+        raise HTTPException(status_code=401, detail="auth required")
+    session = await db.user_sessions.find_one({"session_token": token}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=401, detail="invalid session")
+    record = await db.blog_files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
+    if not record:
+        raise HTTPException(status_code=404, detail="not found")
+    try:
+        data, ctype = get_object(path)
+    except Exception as e:
+        logging.warning(f"Download failed: {e}")
+        raise HTTPException(status_code=502, detail="storage error")
+    return Response(content=data, media_type=record.get("content_type") or ctype)
+
+@api_router.get("/blog/posts")
+async def list_blog(q: Optional[str] = None, topic: Optional[str] = None, user: User = Depends(get_current_user)):
+    query = {}
+    if topic and topic != "all":
+        query["topic"] = topic
+    docs = await db.blog_posts.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    if q:
+        ql = q.lower()
+        docs = [d for d in docs if ql in d.get("title", "").lower() or ql in d.get("body", "").lower() or ql in d.get("topic", "").lower()]
+    return docs
+
+@api_router.post("/blog/posts")
+async def create_blog(payload: BlogPostCreate, user: User = Depends(get_current_user)):
+    if not payload.title.strip() or not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Title and body are required.")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "author_name": user.name,
+        "author_picture": user.picture,
+        "title": payload.title.strip(),
+        "body": payload.body,
+        "topic": (payload.topic or "general").strip().lower(),
+        "video_url": payload.video_url or "",
+        "media": [m.model_dump() for m in payload.media],
+        "summary": "",
+        "likes": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.blog_posts.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/blog/posts/{post_id}")
+async def delete_blog(post_id: str, user: User = Depends(get_current_user)):
+    post = await db.blog_posts.find_one({"id": post_id, "user_id": user.user_id}, {"_id": 0})
+    if not post:
+        raise HTTPException(status_code=404, detail="not found or not yours")
+    await db.blog_posts.delete_one({"id": post_id})
+    # Soft-delete attached media records
+    for m in post.get("media", []):
+        await db.blog_files.update_one({"storage_path": m.get("path")}, {"$set": {"is_deleted": True}})
+    return {"ok": True}
+
+@api_router.post("/blog/posts/{post_id}/summarise")
+async def summarise_blog(post_id: str, user: User = Depends(get_current_user)):
+    post = await db.blog_posts.find_one({"id": post_id}, {"_id": 0})
+    if not post:
+        raise HTTPException(status_code=404, detail="not found")
+    summary = ""
+    if EMERGENT_LLM_KEY:
+        try:
+            chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=f"blogsum-{uuid.uuid4().hex[:8]}",
+                system_message=(
+                    "You are a sharp editor. Summarise the user's educational blog post in EXACTLY 3 crisp bullet points, "
+                    "each under 22 words. Output ONLY the bullets, each starting with '• '. No preamble, no headings."
+                ),
+            ).with_model("anthropic", "claude-sonnet-4-5-20250929")
+            text = f"Title: {post['title']}\nTopic: {post.get('topic','')}\n\n{post['body'][:6000]}"
+            reply = await chat.send_message(UserMessage(text=text))
+            summary = (reply or "").strip()
+        except Exception as e:
+            logging.warning(f"Blog summary failed: {e}")
+    if not summary:
+        # fallback: first 3 long sentences
+        parts = [p.strip() for p in post["body"].replace("\n", " ").split(".") if len(p.strip()) > 15][:3]
+        summary = "\n".join(f"• {p}." for p in parts) or "• Educational post by " + post.get("author_name", "")
+    await db.blog_posts.update_one({"id": post_id}, {"$set": {"summary": summary}})
+    return {"summary": summary}
+
+@api_router.post("/blog/posts/{post_id}/like")
+async def like_blog(post_id: str, user: User = Depends(get_current_user)):
+    existing = await db.blog_likes.find_one({"post_id": post_id, "user_id": user.user_id})
+    if existing:
+        await db.blog_likes.delete_one({"post_id": post_id, "user_id": user.user_id})
+        await db.blog_posts.update_one({"id": post_id}, {"$inc": {"likes": -1}})
+        return {"liked": False}
+    await db.blog_likes.insert_one({"post_id": post_id, "user_id": user.user_id, "created_at": datetime.now(timezone.utc).isoformat()})
+    await db.blog_posts.update_one({"id": post_id}, {"$inc": {"likes": 1}})
+    return {"liked": True}
+
+# ---------- Mount router & middleware (must be after ALL routes) ----------
 app.include_router(api_router)
 
 app.add_middleware(

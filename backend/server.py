@@ -552,6 +552,78 @@ async def journal_export(user: User = Depends(get_current_user)):
         headers={"Content-Disposition": "attachment; filename=journal.pdf"},
     )
 
+# ---------- Community Health Help ----------
+class HealthPostCreate(BaseModel):
+    title: str
+    body: str
+    anonymous: bool = False
+
+class HealthCommentCreate(BaseModel):
+    body: str
+    anonymous: bool = False
+
+@api_router.get("/health/posts")
+async def list_health_posts(user: User = Depends(get_current_user)):
+    docs = await db.health_posts.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return docs
+
+@api_router.post("/health/posts")
+async def create_health_post(payload: HealthPostCreate, user: User = Depends(get_current_user)):
+    post = {
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "author_name": "Anonymous" if payload.anonymous else user.name,
+        "anonymous": payload.anonymous,
+        "title": payload.title,
+        "body": payload.body,
+        "comments_count": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.health_posts.insert_one(post)
+    post.pop("_id", None)
+    return post
+
+@api_router.delete("/health/posts/{post_id}")
+async def delete_health_post(post_id: str, user: User = Depends(get_current_user)):
+    res = await db.health_posts.delete_one({"id": post_id, "user_id": user.user_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found or not yours")
+    await db.health_comments.delete_many({"post_id": post_id})
+    return {"ok": True}
+
+@api_router.get("/health/posts/{post_id}/comments")
+async def list_health_comments(post_id: str, user: User = Depends(get_current_user)):
+    docs = await db.health_comments.find({"post_id": post_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    return docs
+
+@api_router.post("/health/posts/{post_id}/comments")
+async def create_health_comment(post_id: str, payload: HealthCommentCreate, user: User = Depends(get_current_user)):
+    post = await db.health_posts.find_one({"id": post_id}, {"_id": 0})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    comment = {
+        "id": str(uuid.uuid4()),
+        "post_id": post_id,
+        "user_id": user.user_id,
+        "author_name": "Anonymous" if payload.anonymous else user.name,
+        "anonymous": payload.anonymous,
+        "body": payload.body,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.health_comments.insert_one(comment)
+    comment.pop("_id", None)
+    await db.health_posts.update_one({"id": post_id}, {"$inc": {"comments_count": 1}})
+    return comment
+
+@api_router.delete("/health/posts/{post_id}/comments/{comment_id}")
+async def delete_health_comment(post_id: str, comment_id: str, user: User = Depends(get_current_user)):
+    res = await db.health_comments.delete_one({"id": comment_id, "user_id": user.user_id})
+    if res.deleted_count:
+        await db.health_posts.update_one({"id": post_id}, {"$inc": {"comments_count": -1}})
+    return {"ok": True}
+
+
+
 # ---------- Skill Swap ----------
 @api_router.get("/skills")
 async def list_skills(q: Optional[str] = None):
@@ -605,7 +677,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origin_regex=".*",
     allow_methods=["*"],
     allow_headers=["*"],
 )

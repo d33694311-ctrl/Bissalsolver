@@ -31,3 +31,153 @@
     font-family: "Special Elite", monospace;
     letter-spacing: 0.04em;
 }
+
+/* ===== Lively touches (still classic) ===== */
+
+/* Marquee ticker tape */
+.ticker {
+    overflow: hidden;
+    white-space: nowrap;
+    border-top: 1px solid #0a0a0a;
+    border-bottom: 1px solid #0a0a0a;
+    background: #fffbf2;
+}
+.ticker__track {
+    display: inline-block;
+    padding-left: 100%;
+    animation: ticker 38s linear infinite;
+    font-family: "Courier Prime", monospace;
+    letter-spacing: 0.12em;
+    font-size: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+.ticker__track span {
+    margin-right: 3rem;
+}
+.ticker__track .dot {
+    color: #FF3333;
+    margin: 0 1rem;
+}
+@keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+/* Ink stamp on cards */
+.ink-stamp {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    border: 2px solid #FF3333;
+    color: #FF3333;
+    font-family: "Special Elite", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 10px;
+    padding: 4px 10px;
+    transform: rotate(-12deg);
+    opacity: 0.85;
+    pointer-events: none;
+}
+.ink-stamp.green { border-color: #1f6f3a; color: #1f6f3a; }
+.ink-stamp.blue { border-color: #1a4480; color: #1a4480; }
+
+/* Marker / pencil underline under headings */
+.marker-underline {
+    position: relative;
+    display: inline-block;
+}
+.marker-underline::after {
+    content: "";
+    position: absolute;
+    left: -2px;
+    right: -6px;
+    bottom: -6px;
+    height: 10px;
+    background: #FF3333;
+    opacity: 0.18;
+    transform: skewY(-1.2deg);
+    z-index: -1;
+}
+
+/* Gentle lift hover (keep classic) */
+.lift-hover {
+    transition: transform 240ms cubic-bezier(.2,.7,.2,1), box-shadow 240ms;
+}
+.lift-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 6px 6px 0 #0a0a0a;
+}
+
+/* Pull-quote red drop letter */
+.pull-quote {
+    position: relative;
+    padding-left: 28px;
+    font-family: "Special Elite", monospace;
+    color: #0a0a0a;
+}
+.pull-quote::before {
+    content: "“";
+    position: absolute;
+    left: -4px;
+    top: -18px;
+    font-size: 48px;
+    color: #FF3333;
+    line-height: 1;
+}
+
+/* Animated typewriter SVG keys */
+.typewriter-svg {
+    overflow: visible;
+}
+.typewriter-svg .key {
+    animation: keypress 1.6s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+}
+.typewriter-svg .key.k2 { animation-delay: 0.2s; }
+.typewriter-svg .key.k3 { animation-delay: 0.4s; }
+.typewriter-svg .key.k4 { animation-delay: 0.6s; }
+.typewriter-svg .key.k5 { animation-delay: 0.8s; }
+.typewriter-svg .carriage {
+    animation: carriage 4s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+}
+.typewriter-svg .ribbon {
+    animation: ribbon 6s linear infinite;
+}
+@keyframes keypress {
+    0%, 70%, 100% { transform: translateY(0); }
+    35% { transform: translateY(3px); }
+}
+@keyframes carriage {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-6px); }
+}
+@keyframes ribbon {
+    0% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: 30; }
+}
+
+/* Sticky note (used optionally) */
+.sticky-note {
+    background: #fff2a8;
+    box-shadow: 4px 4px 0 #0a0a0a;
+    transform: rotate(-1.5deg);
+    padding: 1rem 1.25rem;
+    font-family: "Courier Prime", monospace;
+}
+
+/* Soft fade-in for first paint */
+@keyframes printIn {
+    0% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+.print-in {
+    animation: printIn 600ms ease-out both;
+}
+.print-in.delay-1 { animation-delay: 0.08s; }
+.print-in.delay-2 { animation-delay: 0.16s; }
+.print-in.delay-3 { animation-delay: 0.24s; }

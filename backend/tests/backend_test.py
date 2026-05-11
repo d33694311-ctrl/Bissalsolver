@@ -163,3 +163,108 @@ def test_skill_review():
 def test_skill_delete():
     r = requests.delete(f"{BASE}/skills/{SKILL_ID['id']}", headers=H)
     assert r.status_code == 200
+
+
+
+# ---------- Community Health Q&A ----------
+H2 = {"Authorization": "Bearer test_session_bissal_token_2"}
+HEALTH = {"post_id": None, "anon_post_id": None, "comment_id": None}
+
+def test_health_post_auth_required():
+    r = requests.post(f"{BASE}/health/posts", json={"title": "x", "body": "y"})
+    assert r.status_code == 401
+    r2 = requests.get(f"{BASE}/health/posts")
+    assert r2.status_code == 401
+
+def test_health_create_named_post():
+    r = requests.post(f"{BASE}/health/posts",
+                      json={"title": "TEST_headache", "body": "frequent headaches", "anonymous": False},
+                      headers=H)
+    assert r.status_code == 200
+    d = r.json()
+    HEALTH["post_id"] = d["id"]
+    assert d["title"] == "TEST_headache"
+    assert d["author_name"] == "Test Bissal"
+    assert d["anonymous"] is False
+    assert d["comments_count"] == 0
+    assert "id" in d and d["user_id"] == "test-user-bissal"
+
+def test_health_create_anonymous_post():
+    r = requests.post(f"{BASE}/health/posts",
+                      json={"title": "TEST_anon", "body": "private question", "anonymous": True},
+                      headers=H)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["author_name"] == "Anonymous"
+    assert d["anonymous"] is True
+    HEALTH["anon_post_id"] = d["id"]
+
+def test_health_list_posts():
+    r = requests.get(f"{BASE}/health/posts", headers=H)
+    assert r.status_code == 200
+    ids = [p["id"] for p in r.json()]
+    assert HEALTH["post_id"] in ids and HEALTH["anon_post_id"] in ids
+
+def test_health_comment_create_increments_count():
+    pid = HEALTH["post_id"]
+    r = requests.post(f"{BASE}/health/posts/{pid}/comments",
+                      json={"body": "TEST_drink water", "anonymous": False}, headers=H2)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["body"] == "TEST_drink water"
+    assert d["author_name"] == "Test Two" or d["author_name"]  # second user's stored name
+    assert d["post_id"] == pid
+    HEALTH["comment_id"] = d["id"]
+    # Verify increment via GET list
+    posts = requests.get(f"{BASE}/health/posts", headers=H).json()
+    p = next(p for p in posts if p["id"] == pid)
+    assert p["comments_count"] == 1
+
+def test_health_comment_anonymous():
+    pid = HEALTH["post_id"]
+    r = requests.post(f"{BASE}/health/posts/{pid}/comments",
+                      json={"body": "TEST_try yoga", "anonymous": True}, headers=H)
+    assert r.status_code == 200
+    assert r.json()["author_name"] == "Anonymous"
+
+def test_health_list_comments():
+    pid = HEALTH["post_id"]
+    r = requests.get(f"{BASE}/health/posts/{pid}/comments", headers=H)
+    assert r.status_code == 200
+    arr = r.json()
+    assert len(arr) >= 2
+    assert any(c["id"] == HEALTH["comment_id"] for c in arr)
+
+def test_health_comment_on_missing_post_404():
+    r = requests.post(f"{BASE}/health/posts/does-not-exist-xyz/comments",
+                      json={"body": "x"}, headers=H)
+    assert r.status_code == 404
+
+def test_health_delete_others_post_404():
+    # H2 tries to delete H's post -> 404 (not yours)
+    r = requests.delete(f"{BASE}/health/posts/{HEALTH['post_id']}", headers=H2)
+    assert r.status_code == 404
+
+def test_health_delete_own_comment_decrements():
+    pid, cid = HEALTH["post_id"], HEALTH["comment_id"]
+    r = requests.delete(f"{BASE}/health/posts/{pid}/comments/{cid}", headers=H2)
+    assert r.status_code == 200
+    posts = requests.get(f"{BASE}/health/posts", headers=H).json()
+    p = next(p for p in posts if p["id"] == pid)
+    # Was 2, deleted 1 -> 1
+    assert p["comments_count"] == 1
+
+def test_health_delete_post_cascades_comments():
+    pid = HEALTH["post_id"]
+    r = requests.delete(f"{BASE}/health/posts/{pid}", headers=H)
+    assert r.status_code == 200
+    # Comments should be cleared
+    c = requests.get(f"{BASE}/health/posts/{pid}/comments", headers=H)
+    assert c.status_code == 200 and c.json() == []
+    # And post gone from list
+    posts = requests.get(f"{BASE}/health/posts", headers=H).json()
+    assert pid not in [p["id"] for p in posts]
+
+def test_health_cleanup_anon_post():
+    r = requests.delete(f"{BASE}/health/posts/{HEALTH['anon_post_id']}", headers=H)
+    assert r.status_code == 200

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Download } from "lucide-react";
+import HealthHelp from "./HealthHelp";
 
 const MOODS = [
   { v: "happy", l: "Happy" },
@@ -139,6 +140,8 @@ export default function MentalJournal() {
           </div>
         )}
       </Section>
+
+      <HealthHelp />
     </div>
   );
 }

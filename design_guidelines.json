@@ -1,0 +1,147 @@
+{
+  "project_name": "Bissal - Problem Solver Hub",
+  "theme": "LIGHT",
+  "archetype": "4 (Swiss & High-Contrast / Editorial)",
+  "design_philosophy": {
+    "core_principles": [
+      "Pure monochrome elegance: White background, black text, sharp 1px borders.",
+      "Classic Print Aesthetic: No rounded corners, no drop shadows. Brutalist editorial layout.",
+      "Typographic Focus: Typewriter/monospaced fonts drive the visual hierarchy.",
+      "One Accent: Use Vermillion Red strictly for urgent actions, active states, or subtle highlights."
+    ],
+    "mood": "Classic, Premium, Minimalist, Intellectual, Functional."
+  },
+  "colors": {
+    "background": {
+      "primary": "#FFFFFF",
+      "secondary": "#F4F4F4",
+      "tertiary": "#EBEBEB"
+    },
+    "text": {
+      "primary": "#0A0A0A",
+      "secondary": "#555555",
+      "inverse": "#FFFFFF",
+      "accent": "#FF3333"
+    },
+    "border": {
+      "default": "#0A0A0A",
+      "subtle": "#E5E5E5"
+    },
+    "accent": {
+      "primary": "#FF3333",
+      "hover": "#CC2929"
+    }
+  },
+  "typography": {
+    "primary_font": "Courier Prime",
+    "primary_font_fallback": "monospace",
+    "secondary_font": "Geist, Inter",
+    "secondary_font_fallback": "sans-serif",
+    "usage": {
+      "headings": {
+        "font": "Courier Prime",
+        "weight": "700",
+        "tracking": "tracking-tighter",
+        "scales": {
+          "h1": "text-4xl sm:text-5xl lg:text-6xl",
+          "h2": "text-2xl sm:text-3xl lg:text-4xl",
+          "h3": "text-xl sm:text-2xl"
+        }
+      },
+      "body": {
+        "font": "Courier Prime",
+        "weight": "400",
+        "leading": "leading-relaxed",
+        "scale": "text-base"
+      },
+      "data_tables_labels": {
+        "font": "Geist",
+        "weight": "400",
+        "tracking": "tracking-widest uppercase",
+        "scale": "text-xs"
+      }
+    }
+  },
+  "layout_and_spacing": {
+    "philosophy": "Swiss Grid / Print Ledger. Elements are divided by strict 1px solid black lines.",
+    "spacing_scale": "p-4, p-6, p-8, p-12",
+    "border_radius": "rounded-none",
+    "shadows": "shadow-none",
+    "borders": "border border-black",
+    "container_styles": {
+      "card": "bg-white border border-black p-6 rounded-none shadow-none",
+      "dashboard_layout": "flex h-screen overflow-hidden bg-white border-black",
+      "sidebar": "w-64 border-r border-black bg-white flex flex-col",
+      "header": "h-16 border-b border-black bg-white flex items-center px-6"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-black text-white hover:bg-[#FF3333] hover:text-white transition-colors duration-200 rounded-none px-6 py-3 font-bold border border-black",
+      "secondary": "bg-white text-black hover:bg-black hover:text-white transition-colors duration-200 rounded-none px-6 py-3 border border-black",
+      "ghost": "bg-transparent text-black hover:text-[#FF3333] transition-colors duration-200"
+    },
+    "inputs": {
+      "default": "border-black rounded-none focus-visible:ring-1 focus-visible:ring-black focus-visible:ring-offset-0 bg-white font-mono"
+    },
+    "data_tables": {
+      "style": "border-collapse w-full text-left",
+      "header": "border-b border-black py-3 px-4 uppercase text-xs font-sans tracking-widest text-[#555555]",
+      "row": "border-b border-[#E5E5E5] hover:bg-[#F4F4F4] transition-colors",
+      "cell": "py-4 px-4 font-mono text-sm"
+    }
+  },
+  "motion": {
+    "philosophy": "Snappy, crisp, zero easing delays for most elements, except the standout Typewriter AI quote effect.",
+    "typewriter_effect": {
+      "description": "Crucial requirement for Mental Health AI Quotes. Characters must appear sequentially to mimic a classic typewriter.",
+      "framer_motion_implementation": {
+        "container": "initial='hidden' animate='visible' variants={{ visible: { transition: { staggerChildren: 0.05 } } }}",
+        "child": "variants={{ hidden: { opacity: 0, y: 5 }, visible: { opacity: 1, y: 0 } }}"
+      }
+    },
+    "hover": "Instant color invert or sharp accent shift. No soft fades."
+  },
+  "modules": {
+    "dashboard_shell": "Left sidebar with monospace navigation links. Active link gets a solid black background or left 4px Vermillion border. Main content area with top border header.",
+    "waste_exchange": "Listings with stark black/white photography (if possible) or heavy typographic emphasis. Search bar full width with thick border.",
+    "water_tracker": "Minimalist charts (Recharts). Black lines, no area fills. Data displayed like a scientific ledger.",
+    "tax_helper": "Spreadsheet aesthetic. Dense, clear, mono-spaced numbers. Export buttons (PDF/Excel) prominent.",
+    "currency_converter": "Oversized typography for exchange rates. Input fields that look like blank spaces on a printed form.",
+    "mental_health_journal": "Distraction-free writing zone. The AI quote section should have an off-white background with the typewriter animation driving the experience.",
+    "skill_swap": "Grid of profile cards. 'Name' and 'Skill' in bold typewriter font. Ratings shown in simple asterisks (*) instead of yellow stars for classic feel."
+  },
+  "media": {
+    "image_strategy": "Minimalist, editorial, highly structural, often black and white or muted tones. Strong shadows.",
+    "images": {
+      "hero_dashboard_empty": {
+        "url": "https://images.unsplash.com/photo-1622255741798-2e31d3cc616d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwyfHxtaW5pbWFsaXN0JTIwYXJjaGl0ZWN0dXJlJTIwc2hhZG93JTIwd2hpdGV8ZW58MHx8fHwxNzc4NDcwMTQyfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Minimalist architecture shadow white, used for empty states or generic module backgrounds."
+      },
+      "water_module": {
+        "url": "https://images.unsplash.com/photo-1554140426-5e830b73a5e8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwyfHxjbGVhciUyMGdsYXNzJTIwd2F0ZXIlMjBzaGFkb3d8ZW58MHx8fHwxNzc4NDcwMTM3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Three clear drinking glasses, used as a subtle visual for the Water Usage Tracker."
+      },
+      "mental_health_journal": {
+        "url": "https://images.unsplash.com/photo-1752137666154-34d38ba92dd7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwyfHx0eXBld3JpdGVyJTIwbm90ZWJvb2slMjBkZXNrfGVufDB8fHx8MTc3ODQ3MDEzNnww&ixlib=rb-4.1.0&q=85",
+        "description": "Typewriter and notepad, setting the mood for the mental health micro-journal."
+      },
+      "tax_business_module": {
+        "url": "https://images.unsplash.com/photo-1762831063505-68022b6133a9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwyfHxjYWxjdWxhdG9yJTIwZGVzayUyMG1pbmltYWxpc3R8ZW58MHx8fHwxNzc4NDcwMTQyfDA&ixlib=rb-4.1.0&q=85",
+        "description": "Calculator and desk, minimalist shot for the Tax Helper module."
+      },
+      "general_texture": {
+        "url": "https://images.unsplash.com/photo-1640995810429-5785ca363fc5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwyfHxibGFuayUyMHdoaXRlJTIwcGFwZXIlMjB0ZXh0dXJlJTIwc2hhZG93fGVufDB8fHx8MTc3ODQ3MDE0Mnww&ixlib=rb-4.1.0&q=85",
+        "description": "Blank white texture with shadows, can be used for subtle background visual interest."
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install `framer-motion` for the typewriter animation.",
+    "Add `@fontsource/courier-prime` and `@fontsource/geist` (or standard Inter) in the project.",
+    "Enforce `rounded-none` on all Shadcn components. Remove default radius.",
+    "Set the Tailwind config to use Courier Prime as the sans/mono default.",
+    "Apply strict `border-black` classes on wrappers. Aim for a 'Print Ledger' UI feel.",
+    "Ensure all interactive elements have `data-testid` attributes."
+  ]
+}

@@ -20,7 +20,7 @@ import NotificationBell from "@/components/NotificationBell";
 
 const navGroups = [
   { label: "Overview", items: [{ to: "/dashboard", label: "Index", icon: LayoutGrid, end: true, key: "home" }] },
-  { label: "Sustainability", items: [
+  { label: "Consumption Exchange", items: [
     { to: "/dashboard/waste", label: "Waste Exchange", icon: Recycle, key: "waste" },
     { to: "/dashboard/water", label: "Water Tracker", icon: Droplet, key: "water" },
   ]},
@@ -32,7 +32,7 @@ const navGroups = [
     { to: "/dashboard/revision", label: "Revision", icon: BookOpen, key: "revision" },
     { to: "/dashboard/amendments", label: "Amendments", icon: Gavel, key: "amendments" },
   ]},
-  { label: "Health", items: [
+  { label: "Wellness", items: [
     { to: "/dashboard/medicines", label: "Medicines", icon: Pill, key: "medicines" },
     { to: "/dashboard/journal", label: "Journal & Q&A", icon: BookText, key: "journal" },
   ]},

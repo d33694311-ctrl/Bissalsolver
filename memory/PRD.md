@@ -11,13 +11,23 @@ Build "Problem Solver Hub" (branded **Bissal**) — multi-module website tacklin
 - Live currency: open.er-api.com (free, no key)
 - Exports: reportlab (PDF) + openpyxl (Excel)
 
-## Implemented Modules (6 — v1)
+## Implemented Modules (6 — v1) + Community Health Q&A (v1.1)
 1. **Waste Exchange** — list/search recyclables, contact field, material filter
 2. **Water Tracker** — daily logs, chart with conservation benchmark, .xlsx export
 3. **Tax Helper** — income/expense ledger, auto P&L + estimated tax, PDF + Excel export
 4. **Currency + Logistics** — live rates + customs %, transport, fees → landed cost
 5. **Mental Journal** — mood log + Claude-typed motivational quote w/ typewriter animation, PDF export
+   - **NEW · Community Health Q&A** — public posts with anonymous toggle, threaded suggestions/comments, comment count, cascade-delete
 6. **Skill Swap** — listings, search, ratings (asterisks) + reviews
+
+## Liveliness upgrades (v1.1)
+- Animated typewriter SVG hero illustration (keys press, ribbon dashes scroll)
+- Ticker tape under top bar with rotating workshop news
+- Vermillion ink-stamp badges on every module card (FRESH/DAILY/OFFICIAL/LIVE/QUIET/OPEN)
+- Marker-underline accent on headings, red drop-quote pull quote
+- Soft lift-hover (drop shadow + translate) on cards & CTAs
+- Community Health Q&A callout band on landing
+- Print-in fade animation on first paint
 
 ## User Personas
 - Micro-business owner (Tax)

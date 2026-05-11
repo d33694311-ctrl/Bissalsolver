@@ -28,3 +28,5 @@ emergentintegrations==0.1.0
 reportlab==4.5.0
 openpyxl==3.1.5
 httpx==0.28.1
+feedparser==6.0.12
+beautifulsoup4==4.14.3

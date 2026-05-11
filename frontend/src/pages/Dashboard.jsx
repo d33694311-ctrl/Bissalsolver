@@ -1,24 +1,48 @@
 import React, { useEffect } from "react";
 import { Routes, Route, NavLink, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { Recycle, Droplet, Calculator, Globe2, BookText, Users, LogOut, LayoutGrid } from "lucide-react";
+import {
+  Recycle, Droplet, Calculator, Globe2, BookText, Users,
+  LogOut, LayoutGrid, BookOpen, Gavel, Pill, CloudSun,
+} from "lucide-react";
 import WasteExchange from "@/modules/WasteExchange";
 import WaterTracker from "@/modules/WaterTracker";
 import TaxHelper from "@/modules/TaxHelper";
 import CurrencyConverter from "@/modules/CurrencyConverter";
 import MentalJournal from "@/modules/MentalJournal";
 import SkillSwap from "@/modules/SkillSwap";
+import Revision from "@/modules/Revision";
+import Amendments from "@/modules/Amendments";
+import Medicines from "@/modules/Medicines";
+import Weather from "@/modules/Weather";
 import DashboardHome from "@/modules/DashboardHome";
+import NotificationBell from "@/components/NotificationBell";
 
-const nav = [
-  { to: "/dashboard", label: "Index", icon: LayoutGrid, end: true, key: "home" },
-  { to: "/dashboard/waste", label: "Waste Exchange", icon: Recycle, key: "waste" },
-  { to: "/dashboard/water", label: "Water Tracker", icon: Droplet, key: "water" },
-  { to: "/dashboard/tax", label: "Tax Helper", icon: Calculator, key: "tax" },
-  { to: "/dashboard/currency", label: "Currency", icon: Globe2, key: "currency" },
-  { to: "/dashboard/journal", label: "Journal", icon: BookText, key: "journal" },
-  { to: "/dashboard/skills", label: "Skill Swap", icon: Users, key: "skills" },
+const navGroups = [
+  { label: "Overview", items: [{ to: "/dashboard", label: "Index", icon: LayoutGrid, end: true, key: "home" }] },
+  { label: "Sustainability", items: [
+    { to: "/dashboard/waste", label: "Waste Exchange", icon: Recycle, key: "waste" },
+    { to: "/dashboard/water", label: "Water Tracker", icon: Droplet, key: "water" },
+  ]},
+  { label: "Finance", items: [
+    { to: "/dashboard/tax", label: "Tax Helper", icon: Calculator, key: "tax" },
+    { to: "/dashboard/currency", label: "Currency", icon: Globe2, key: "currency" },
+  ]},
+  { label: "Education", items: [
+    { to: "/dashboard/revision", label: "Revision", icon: BookOpen, key: "revision" },
+    { to: "/dashboard/amendments", label: "Amendments", icon: Gavel, key: "amendments" },
+  ]},
+  { label: "Health", items: [
+    { to: "/dashboard/medicines", label: "Medicines", icon: Pill, key: "medicines" },
+    { to: "/dashboard/journal", label: "Journal & Q&A", icon: BookText, key: "journal" },
+  ]},
+  { label: "Community", items: [
+    { to: "/dashboard/weather", label: "Weather", icon: CloudSun, key: "weather" },
+    { to: "/dashboard/skills", label: "Skill Swap", icon: Users, key: "skills" },
+  ]},
 ];
+
+const allMobileItems = navGroups.flatMap((g) => g.items);
 
 export default function Dashboard() {
   const { user, loading, logout } = useAuth();
@@ -39,27 +63,32 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen flex bg-white text-black" data-testid="dashboard-shell">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-black flex flex-col flex-shrink-0 hidden md:flex">
+      <aside className="w-64 border-r border-black flex-col flex-shrink-0 hidden md:flex sticky top-0 h-screen overflow-y-auto">
         <div className="border-b border-black p-6">
           <Link to="/" className="bissal-mark text-2xl block" data-testid="sidebar-brand">Bissal.</Link>
           <p className="font-mono-print text-[10px] tracking-widest-print uppercase mt-1 text-neutral-600">Problem Solver Hub</p>
         </div>
-        <nav className="flex-1 py-4">
-          {nav.map((n) => (
-            <NavLink
-              key={n.key}
-              to={n.to}
-              end={n.end}
-              data-testid={`nav-${n.key}`}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-6 py-3 font-mono-print text-sm border-l-4 ${
-                  isActive ? "bg-black text-white border-[#FF3333]" : "border-transparent hover:bg-neutral-100"
-                }`
-              }
-            >
-              <n.icon className="w-4 h-4" strokeWidth={1.5} />
-              <span>{n.label}</span>
-            </NavLink>
+        <nav className="flex-1 py-2">
+          {navGroups.map((g) => (
+            <div key={g.label} className="mb-2">
+              <p className="px-6 pt-3 pb-1 font-mono-print text-[10px] tracking-widest-print uppercase text-neutral-500">{g.label}</p>
+              {g.items.map((n) => (
+                <NavLink
+                  key={n.key}
+                  to={n.to}
+                  end={n.end}
+                  data-testid={`nav-${n.key}`}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-6 py-2 font-mono-print text-sm border-l-4 ${
+                      isActive ? "bg-black text-white border-[#FF3333]" : "border-transparent hover:bg-neutral-100"
+                    }`
+                  }
+                >
+                  <n.icon className="w-4 h-4" strokeWidth={1.5} />
+                  <span>{n.label}</span>
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="border-t border-black p-4">
@@ -87,14 +116,23 @@ export default function Dashboard() {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-black z-30 flex items-center justify-between px-4 py-3">
         <Link to="/" className="bissal-mark text-xl">Bissal.</Link>
-        <button onClick={logout} className="font-mono-print text-xs border border-black px-3 py-1" data-testid="mobile-logout">Out</button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <button onClick={logout} className="font-mono-print text-xs border border-black px-3 py-1" data-testid="mobile-logout">Out</button>
+        </div>
       </div>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto md:pt-0 pt-14">
+      <main className="flex-1 overflow-y-auto md:pt-0 pt-14 relative">
+        {/* Desktop top-right bell */}
+        <div className="hidden md:flex items-center justify-end gap-3 px-6 py-3 border-b border-black bg-white sticky top-0 z-20">
+          <span className="font-mono-print text-xs uppercase tracking-widest-print text-neutral-600 hidden lg:inline">{new Date().toLocaleDateString("en-GB")}</span>
+          <NotificationBell />
+        </div>
+
         {/* Mobile nav strip */}
         <div className="md:hidden border-b border-black overflow-x-auto whitespace-nowrap">
-          {nav.map((n) => (
+          {allMobileItems.map((n) => (
             <NavLink
               key={n.key}
               to={n.to}
@@ -116,7 +154,11 @@ export default function Dashboard() {
           <Route path="water" element={<WaterTracker />} />
           <Route path="tax" element={<TaxHelper />} />
           <Route path="currency" element={<CurrencyConverter />} />
+          <Route path="revision" element={<Revision />} />
+          <Route path="amendments" element={<Amendments />} />
+          <Route path="medicines" element={<Medicines />} />
           <Route path="journal" element={<MentalJournal />} />
+          <Route path="weather" element={<Weather />} />
           <Route path="skills" element={<SkillSwap />} />
         </Routes>
       </main>

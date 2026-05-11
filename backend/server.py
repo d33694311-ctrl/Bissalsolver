@@ -613,6 +613,16 @@ async def create_health_comment(post_id: str, payload: HealthCommentCreate, user
     await db.health_comments.insert_one(comment)
     comment.pop("_id", None)
     await db.health_posts.update_one({"id": post_id}, {"$inc": {"comments_count": 1}})
+    # Notify the post owner (if not commenting on own post)
+    if post["user_id"] != user.user_id:
+        await _create_notification(
+            user_id=post["user_id"],
+            kind="health_reply",
+            title="New suggestion on your post",
+            message=f'{comment["author_name"]} replied to "{post["title"]}"',
+            link="/dashboard/journal",
+            ref_id=post_id,
+        )
     return comment
 
 @api_router.delete("/health/posts/{post_id}/comments/{comment_id}")
@@ -621,6 +631,362 @@ async def delete_health_comment(post_id: str, comment_id: str, user: User = Depe
     if res.deleted_count:
         await db.health_posts.update_one({"id": post_id}, {"$inc": {"comments_count": -1}})
     return {"ok": True}
+
+# ---------- Notifications ----------
+async def _create_notification(user_id: str, kind: str, title: str, message: str, link: str, ref_id: Optional[str] = None):
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "kind": kind,
+        "title": title,
+        "message": message,
+        "link": link,
+        "ref_id": ref_id,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+@api_router.get("/notifications")
+async def list_notifications(user: User = Depends(get_current_user)):
+    docs = await db.notifications.find({"user_id": user.user_id}, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
+    unread = await db.notifications.count_documents({"user_id": user.user_id, "read": False})
+    return {"items": docs, "unread": unread}
+
+@api_router.post("/notifications/{nid}/read")
+async def mark_notification_read(nid: str, user: User = Depends(get_current_user)):
+    await db.notifications.update_one({"id": nid, "user_id": user.user_id}, {"$set": {"read": True}})
+    return {"ok": True}
+
+@api_router.post("/notifications/read-all")
+async def mark_all_read(user: User = Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user.user_id, "read": False}, {"$set": {"read": True}})
+    return {"ok": True}
+
+# ---------- Revision: Summariser + Flashcards ----------
+class RevisionRequest(BaseModel):
+    title: Optional[str] = ""
+    notes: str
+
+@api_router.post("/revision/generate")
+async def revision_generate(payload: RevisionRequest, user: User = Depends(get_current_user)):
+    notes = payload.notes.strip()
+    if len(notes) < 30:
+        raise HTTPException(status_code=400, detail="Please paste at least 30 characters of notes.")
+    summary = ""
+    table = []
+    flashcards = []
+    if EMERGENT_LLM_KEY:
+        try:
+            import json as _json
+            sys_msg = (
+                "You are a study assistant. Given raw notes, produce STRICT JSON with this shape: "
+                '{"summary": "<3-5 sentence summary>", '
+                '"table": [{"topic":"...", "key_point":"...", "example_or_formula":"..."}, ...up to 10 rows], '
+                '"flashcards": [{"q":"...", "a":"..."}, ...up to 12 items]}. '
+                "Do not wrap in markdown fences. Output JSON only."
+            )
+            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"rev-{uuid.uuid4().hex[:8]}", system_message=sys_msg).with_model("anthropic", "claude-sonnet-4-5-20250929")
+            reply = await chat.send_message(UserMessage(text=notes))
+            text = (reply or "").strip()
+            if text.startswith("```"):
+                text = text.strip("`")
+                if text.lower().startswith("json"):
+                    text = text[4:].strip()
+            data = _json.loads(text)
+            summary = data.get("summary", "")
+            table = data.get("table", [])
+            flashcards = data.get("flashcards", [])
+        except Exception as e:
+            logging.warning(f"Revision LLM failed: {e}")
+    if not summary:
+        # Fallback: simple chunking
+        sentences = [s.strip() for s in notes.replace("\n", " ").split(".") if len(s.strip()) > 10][:6]
+        summary = ". ".join(sentences[:4]) + ("." if sentences else "")
+        table = [{"topic": f"Point {i+1}", "key_point": s, "example_or_formula": ""} for i, s in enumerate(sentences[:6])]
+        flashcards = [{"q": f"What is point {i+1}?", "a": s} for i, s in enumerate(sentences[:6])]
+
+    session = {
+        "id": str(uuid.uuid4()),
+        "user_id": user.user_id,
+        "title": payload.title or "Revision session",
+        "notes": notes[:4000],
+        "summary": summary,
+        "table": table,
+        "flashcards": flashcards,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.revision_sessions.insert_one(session)
+    session.pop("_id", None)
+    return session
+
+@api_router.get("/revision/sessions")
+async def list_revision_sessions(user: User = Depends(get_current_user)):
+    docs = await db.revision_sessions.find({"user_id": user.user_id}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return docs
+
+@api_router.delete("/revision/sessions/{sid}")
+async def delete_revision_session(sid: str, user: User = Depends(get_current_user)):
+    await db.revision_sessions.delete_one({"id": sid, "user_id": user.user_id})
+    return {"ok": True}
+
+@api_router.get("/revision/sessions/{sid}/pdf")
+async def revision_pdf(sid: str, user: User = Depends(get_current_user)):
+    doc = await db.revision_sessions.find_one({"id": sid, "user_id": user.user_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Not found")
+    buf = io.BytesIO()
+    pdf = SimpleDocTemplate(buf, pagesize=letter)
+    styles = getSampleStyleSheet()
+    title = ParagraphStyle(name="t", parent=styles["Heading1"], fontName="Courier-Bold", fontSize=18)
+    h2 = ParagraphStyle(name="h2", parent=styles["Heading2"], fontName="Courier-Bold", fontSize=13)
+    body = ParagraphStyle(name="b", parent=styles["Normal"], fontName="Courier", fontSize=10, leading=14)
+    elements = [Paragraph(f"BISSAL — {doc['title'].upper()}", title), Spacer(1, 8), Paragraph("SUMMARY", h2), Paragraph(doc["summary"], body), Spacer(1, 14), Paragraph("REVISION TABLE", h2)]
+    rows = [["Topic", "Key point", "Example / Formula"]]
+    for r in doc.get("table", []):
+        rows.append([r.get("topic", "")[:30], r.get("key_point", "")[:60], r.get("example_or_formula", "")[:40]])
+    if len(rows) == 1:
+        rows.append(["—", "—", "—"])
+    t = Table(rows, hAlign="LEFT")
+    t.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "Courier"),
+        ("FONTNAME", (0, 0), (-1, 0), "Courier-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.black),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 14))
+    elements.append(Paragraph("FLASHCARDS", h2))
+    for i, fc in enumerate(doc.get("flashcards", []), 1):
+        elements.append(Paragraph(f"{i}. Q: {fc.get('q','')}", body))
+        elements.append(Paragraph(f"   A: {fc.get('a','')}", body))
+        elements.append(Spacer(1, 6))
+    pdf.build(elements)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=revision_{sid[:6]}.pdf"})
+
+# ---------- Amendment Tracker (live regulator feeds) ----------
+import feedparser
+from bs4 import BeautifulSoup
+
+REG_SOURCES = {
+    "RBI": {
+        "kind": "rss",
+        "url": "https://news.google.com/rss/search?q=%22Reserve+Bank+of+India%22+notification+OR+circular+OR+amendment&hl=en-IN&gl=IN&ceid=IN:en",
+        "site": "https://www.rbi.org.in",
+    },
+    "SEBI": {
+        "kind": "rss",
+        "url": "https://www.sebi.gov.in/sebirss.xml",
+        "site": "https://www.sebi.gov.in",
+    },
+    "GST": {
+        "kind": "rss",
+        "url": "https://news.google.com/rss/search?q=%22GST+Council%22+OR+%22CBIC%22+notification+OR+circular&hl=en-IN&gl=IN&ceid=IN:en",
+        "site": "https://www.cbic.gov.in",
+    },
+    "Income Tax": {
+        "kind": "rss",
+        "url": "https://news.google.com/rss/search?q=%22Income+Tax%22+India+notification+OR+circular+OR+amendment&hl=en-IN&gl=IN&ceid=IN:en",
+        "site": "https://incometaxindia.gov.in",
+    },
+    "MCA": {
+        "kind": "rss",
+        "url": "https://news.google.com/rss/search?q=%22Ministry+of+Corporate+Affairs%22+notification+OR+amendment&hl=en-IN&gl=IN&ceid=IN:en",
+        "site": "https://www.mca.gov.in",
+    },
+    "ICAI": {
+        "kind": "rss",
+        "url": "https://news.google.com/rss/search?q=ICAI+announcement+OR+amendment+OR+notification&hl=en-IN&gl=IN&ceid=IN:en",
+        "site": "https://www.icai.org",
+    },
+}
+
+_amend_cache = {"data": None, "ts": None}
+
+async def _fetch_rss(name: str, src: dict) -> list:
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 BissalBot"}) as c:
+            r = await c.get(src["url"])
+        if r.status_code != 200:
+            return []
+        parsed = feedparser.parse(r.text)
+        items = []
+        for e in parsed.entries[:8]:
+            items.append({
+                "source": name,
+                "title": e.get("title", "")[:200],
+                "summary": BeautifulSoup(e.get("summary", ""), "html.parser").get_text()[:280] if e.get("summary") else "",
+                "link": e.get("link", src["site"]),
+                "published": e.get("published", e.get("updated", "")),
+            })
+        return items
+    except Exception as ex:
+        logging.warning(f"RSS {name} failed: {ex}")
+        return []
+
+async def _fetch_scrape(name: str, src: dict) -> list:
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 BissalBot"}) as c:
+            r = await c.get(src["url"])
+        if r.status_code != 200:
+            return []
+        soup = BeautifulSoup(r.text, "html.parser")
+        items = []
+        # Grab the first 8 <a> tags inside main content that look like notifications
+        for a in soup.find_all("a", href=True)[:200]:
+            text = a.get_text(" ", strip=True)
+            href = a["href"]
+            if len(text) < 25 or len(text) > 220:
+                continue
+            tlow = text.lower()
+            if not any(k in tlow for k in ["notification", "circular", "amend", "rule", "act", "order", "press", "release", "announce", "advisory", "instruct"]):
+                continue
+            if href.startswith("/"):
+                href = src["site"].rstrip("/") + href
+            elif not href.startswith("http"):
+                continue
+            items.append({"source": name, "title": text[:200], "summary": "", "link": href, "published": ""})
+            if len(items) >= 8:
+                break
+        return items
+    except Exception as ex:
+        logging.warning(f"Scrape {name} failed: {ex}")
+        return []
+
+@api_router.get("/amendments")
+async def get_amendments(source: Optional[str] = None, q: Optional[str] = None, force: bool = False):
+    now = datetime.now(timezone.utc)
+    if not force and _amend_cache["ts"] and (now - _amend_cache["ts"]).total_seconds() < 1800 and _amend_cache["data"]:
+        all_items = _amend_cache["data"]
+    else:
+        all_items = []
+        for name, src in REG_SOURCES.items():
+            if src["kind"] == "rss":
+                all_items.extend(await _fetch_rss(name, src))
+            else:
+                all_items.extend(await _fetch_scrape(name, src))
+        _amend_cache["data"] = all_items
+        _amend_cache["ts"] = now
+    items = all_items
+    if source and source != "all":
+        items = [i for i in items if i["source"].lower() == source.lower()]
+    if q:
+        ql = q.lower()
+        items = [i for i in items if ql in i["title"].lower() or ql in i.get("summary", "").lower()]
+    return {"items": items, "sources": list(REG_SOURCES.keys()), "cached_at": (_amend_cache["ts"].isoformat() if _amend_cache["ts"] else None)}
+
+# ---------- Medicine Finder ----------
+SEED_MEDICINES = [
+    {"name": "Paracetamol 500mg", "generic": "Acetaminophen", "conditions": ["fever", "headache", "pain", "cold"], "alternatives": ["Crocin", "Calpol", "Dolo 650"], "avg_price": 25, "unit": "10 tabs"},
+    {"name": "Ibuprofen 400mg", "generic": "Ibuprofen", "conditions": ["pain", "inflammation", "fever", "body ache"], "alternatives": ["Brufen", "Combiflam"], "avg_price": 35, "unit": "10 tabs"},
+    {"name": "Amoxicillin 500mg", "generic": "Amoxicillin", "conditions": ["bacterial infection", "throat infection", "ear infection"], "alternatives": ["Mox 500", "Amoxil"], "avg_price": 110, "unit": "10 caps"},
+    {"name": "Cetirizine 10mg", "generic": "Cetirizine", "conditions": ["allergy", "runny nose", "itching", "sneezing"], "alternatives": ["Cetzine", "Alerid", "Zyrtec"], "avg_price": 18, "unit": "10 tabs"},
+    {"name": "Omeprazole 20mg", "generic": "Omeprazole", "conditions": ["acidity", "heartburn", "ulcer", "gastritis"], "alternatives": ["Omez", "Prilosec"], "avg_price": 55, "unit": "10 caps"},
+    {"name": "Metformin 500mg", "generic": "Metformin", "conditions": ["diabetes", "type 2 diabetes", "blood sugar"], "alternatives": ["Glycomet", "Glucophage"], "avg_price": 32, "unit": "10 tabs"},
+    {"name": "Atorvastatin 10mg", "generic": "Atorvastatin", "conditions": ["high cholesterol", "heart disease prevention"], "alternatives": ["Atorva", "Lipitor"], "avg_price": 85, "unit": "10 tabs"},
+    {"name": "Amlodipine 5mg", "generic": "Amlodipine", "conditions": ["high blood pressure", "hypertension", "angina"], "alternatives": ["Amlong", "Stamlo"], "avg_price": 45, "unit": "10 tabs"},
+    {"name": "Salbutamol Inhaler", "generic": "Salbutamol", "conditions": ["asthma", "wheezing", "breathlessness"], "alternatives": ["Asthalin", "Ventolin"], "avg_price": 165, "unit": "inhaler"},
+    {"name": "Loperamide 2mg", "generic": "Loperamide", "conditions": ["diarrhea", "loose motion"], "alternatives": ["Imodium", "Lopamide"], "avg_price": 22, "unit": "10 caps"},
+    {"name": "Pantoprazole 40mg", "generic": "Pantoprazole", "conditions": ["acidity", "GERD", "ulcer"], "alternatives": ["Pan 40", "Pantocid"], "avg_price": 78, "unit": "10 tabs"},
+    {"name": "Azithromycin 500mg", "generic": "Azithromycin", "conditions": ["bacterial infection", "throat infection", "skin infection"], "alternatives": ["Azee", "Zithromax"], "avg_price": 130, "unit": "3 tabs"},
+    {"name": "Diclofenac 50mg", "generic": "Diclofenac", "conditions": ["pain", "arthritis", "inflammation", "back pain"], "alternatives": ["Voveran", "Diclomol"], "avg_price": 28, "unit": "10 tabs"},
+    {"name": "Levothyroxine 50mcg", "generic": "Levothyroxine", "conditions": ["thyroid", "hypothyroidism"], "alternatives": ["Thyronorm", "Eltroxin"], "avg_price": 95, "unit": "30 tabs"},
+    {"name": "Multivitamin Tablet", "generic": "Multivitamin", "conditions": ["weakness", "fatigue", "vitamin deficiency", "nutrition"], "alternatives": ["Revital", "Becosules", "Supradyn"], "avg_price": 140, "unit": "30 tabs"},
+    {"name": "ORS Sachet", "generic": "Oral Rehydration Salts", "conditions": ["dehydration", "diarrhea", "vomiting"], "alternatives": ["Electral", "Walyte"], "avg_price": 22, "unit": "sachet"},
+    {"name": "Ranitidine 150mg", "generic": "Ranitidine", "conditions": ["acidity", "heartburn"], "alternatives": ["Rantac", "Aciloc"], "avg_price": 40, "unit": "10 tabs"},
+    {"name": "Vitamin D3 60K", "generic": "Cholecalciferol", "conditions": ["vitamin d deficiency", "bone pain", "weakness"], "alternatives": ["Calcirol", "Uprise D3"], "avg_price": 45, "unit": "4 sachets"},
+    {"name": "Aspirin 75mg", "generic": "Aspirin", "conditions": ["heart attack prevention", "blood thinner", "pain"], "alternatives": ["Ecosprin", "Disprin"], "avg_price": 12, "unit": "10 tabs"},
+    {"name": "Montelukast 10mg", "generic": "Montelukast", "conditions": ["asthma", "allergy", "allergic rhinitis"], "alternatives": ["Montair", "Singulair"], "avg_price": 165, "unit": "10 tabs"},
+]
+
+async def _ensure_medicine_seed():
+    count = await db.medicines.count_documents({})
+    if count == 0:
+        docs = []
+        for m in SEED_MEDICINES:
+            d = {"id": str(uuid.uuid4()), **m, "added_by": "system", "created_at": datetime.now(timezone.utc).isoformat()}
+            docs.append(d)
+        if docs:
+            await db.medicines.insert_many(docs)
+
+@app.on_event("startup")
+async def on_startup():
+    await _ensure_medicine_seed()
+
+@api_router.get("/medicines/search")
+async def search_medicines(q: Optional[str] = ""):
+    q = (q or "").strip().lower()
+    cursor = db.medicines.find({}, {"_id": 0})
+    docs = await cursor.to_list(1000)
+    if q:
+        def match(m):
+            hay = " ".join([
+                m.get("name", ""), m.get("generic", ""),
+                " ".join(m.get("conditions", []) or []),
+                " ".join(m.get("alternatives", []) or []),
+            ]).lower()
+            return q in hay
+        docs = [m for m in docs if match(m)]
+    docs.sort(key=lambda m: m.get("avg_price", 0))
+    return docs[:30]
+
+class MedicineCreate(BaseModel):
+    name: str
+    generic: Optional[str] = ""
+    conditions: List[str] = []
+    alternatives: List[str] = []
+    avg_price: float
+    unit: Optional[str] = ""
+
+@api_router.post("/medicines")
+async def add_medicine(payload: MedicineCreate, user: User = Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": payload.name,
+        "generic": payload.generic,
+        "conditions": payload.conditions,
+        "alternatives": payload.alternatives,
+        "avg_price": payload.avg_price,
+        "unit": payload.unit,
+        "added_by": user.user_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.medicines.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+# ---------- Weather Hub ----------
+@api_router.get("/weather/geocode")
+async def weather_geocode(q: str):
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get(f"https://geocoding-api.open-meteo.com/v1/search?name={q}&count=5&language=en&format=json")
+        if r.status_code == 200:
+            return r.json()
+    except Exception as e:
+        logging.warning(f"Geocode failed: {e}")
+    return {"results": []}
+
+@api_router.get("/weather/forecast")
+async def weather_forecast(lat: float, lon: float):
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(
+                "https://api.open-meteo.com/v1/forecast",
+                params={
+                    "latitude": lat,
+                    "longitude": lon,
+                    "current": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code,apparent_temperature",
+                    "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max",
+                    "timezone": "auto",
+                    "forecast_days": 7,
+                },
+            )
+        if r.status_code == 200:
+            return r.json()
+    except Exception as e:
+        logging.warning(f"Forecast failed: {e}")
+    raise HTTPException(status_code=502, detail="Weather service unavailable")
 
 
 

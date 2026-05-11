@@ -268,3 +268,161 @@ def test_health_delete_post_cascades_comments():
 def test_health_cleanup_anon_post():
     r = requests.delete(f"{BASE}/health/posts/{HEALTH['anon_post_id']}", headers=H)
     assert r.status_code == 200
+
+
+# ---------- Revision (Claude summariser + flashcards) ----------
+REV_ID = {"id": None}
+
+def test_revision_generate_auth_required():
+    r = requests.post(f"{BASE}/revision/generate", json={"notes": "x" * 50})
+    assert r.status_code == 401
+
+def test_revision_generate_too_short_400():
+    r = requests.post(f"{BASE}/revision/generate", json={"notes": "too short"}, headers=H)
+    assert r.status_code == 400
+
+def test_revision_generate_creates_session():
+    notes = ("Photosynthesis is the process by which green plants convert sunlight into chemical energy. "
+             "It occurs in chloroplasts and produces oxygen as a by-product. The overall equation is "
+             "6CO2 + 6H2O -> C6H12O6 + 6O2. Light reactions occur in thylakoid membranes; the Calvin cycle in stroma.")
+    r = requests.post(f"{BASE}/revision/generate", json={"title": "TEST_photosynth", "notes": notes}, headers=H, timeout=60)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    REV_ID["id"] = d["id"]
+    assert d["summary"] and len(d["summary"]) > 10
+    assert isinstance(d["table"], list) and len(d["table"]) >= 1
+    assert isinstance(d["flashcards"], list) and len(d["flashcards"]) >= 1
+    # flashcards must have q/a
+    assert "q" in d["flashcards"][0] and "a" in d["flashcards"][0]
+
+def test_revision_list_sessions():
+    r = requests.get(f"{BASE}/revision/sessions", headers=H)
+    assert r.status_code == 200
+    ids = [s["id"] for s in r.json()]
+    assert REV_ID["id"] in ids
+
+def test_revision_pdf_download():
+    r = requests.get(f"{BASE}/revision/sessions/{REV_ID['id']}/pdf", headers=H)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:4] == b"%PDF"
+
+def test_revision_delete_cleanup():
+    r = requests.delete(f"{BASE}/revision/sessions/{REV_ID['id']}", headers=H)
+    assert r.status_code == 200
+
+
+# ---------- Amendment Tracker ----------
+def test_amendments_returns_items_and_sources():
+    r = requests.get(f"{BASE}/amendments", params={"force": True}, timeout=30)
+    assert r.status_code == 200
+    d = r.json()
+    assert "items" in d and "sources" in d and "cached_at" in d
+    expected = {"RBI", "SEBI", "GST", "Income Tax", "MCA", "ICAI"}
+    assert expected.issubset(set(d["sources"]))
+    # Should have at least some items (gracefully empty allowed per source, but combined >= 20 expected normally)
+    assert isinstance(d["items"], list)
+    assert len(d["items"]) >= 20, f"Expected >=20 items, got {len(d['items'])}"
+
+def test_amendments_filter_by_source():
+    r = requests.get(f"{BASE}/amendments", params={"source": "RBI"}, timeout=30)
+    assert r.status_code == 200
+    items = r.json()["items"]
+    if items:
+        assert all(i["source"] == "RBI" for i in items)
+
+def test_amendments_filter_by_q():
+    r = requests.get(f"{BASE}/amendments", params={"q": "circular"}, timeout=30)
+    assert r.status_code == 200
+    for i in r.json()["items"]:
+        assert "circular" in (i["title"] + " " + i.get("summary", "")).lower()
+
+
+# ---------- Medicines ----------
+def test_medicines_empty_q_returns_top30():
+    r = requests.get(f"{BASE}/medicines/search")
+    assert r.status_code == 200
+    arr = r.json()
+    assert isinstance(arr, list)
+    assert len(arr) >= 1
+    # Sorted by price ascending
+    prices = [m.get("avg_price", 0) for m in arr]
+    assert prices == sorted(prices)
+
+def test_medicines_search_fever():
+    r = requests.get(f"{BASE}/medicines/search", params={"q": "fever"})
+    assert r.status_code == 200
+    arr = r.json()
+    assert len(arr) >= 1
+    names = " ".join(m["name"].lower() for m in arr) + " ".join(" ".join(m.get("conditions", [])) for m in arr)
+    assert "fever" in names.lower() or "paracetamol" in names.lower()
+
+def test_medicines_search_diabetes_returns_metformin():
+    r = requests.get(f"{BASE}/medicines/search", params={"q": "diabetes"})
+    assert r.status_code == 200
+    arr = r.json()
+    assert any("metformin" in m["name"].lower() for m in arr)
+
+
+# ---------- Weather ----------
+def test_weather_geocode_kathmandu():
+    r = requests.get(f"{BASE}/weather/geocode", params={"q": "Kathmandu"}, timeout=15)
+    assert r.status_code == 200
+    d = r.json()
+    assert "results" in d
+    assert len(d["results"]) >= 1
+    assert "latitude" in d["results"][0] and "longitude" in d["results"][0]
+
+def test_weather_forecast():
+    r = requests.get(f"{BASE}/weather/forecast", params={"lat": 27.7, "lon": 85.3}, timeout=15)
+    assert r.status_code == 200
+    d = r.json()
+    assert "current" in d and "daily" in d
+    assert "temperature_2m" in d["current"]
+    assert isinstance(d["daily"].get("temperature_2m_max"), list) and len(d["daily"]["temperature_2m_max"]) >= 7
+
+
+# ---------- Notifications ----------
+H2 = {"Authorization": "Bearer test_session_bissal_token_2"}
+NOTIF = {"post_id": None}
+
+def test_notifications_auth_required():
+    r = requests.get(f"{BASE}/notifications")
+    assert r.status_code == 401
+
+def test_notification_created_when_other_user_comments():
+    # User1 creates a post
+    r = requests.post(f"{BASE}/health/posts",
+                      json={"title": "TEST_notif_post", "body": "test notif body", "anonymous": False},
+                      headers=H)
+    assert r.status_code == 200
+    pid = r.json()["id"]
+    NOTIF["post_id"] = pid
+    # User2 comments on it
+    rc = requests.post(f"{BASE}/health/posts/{pid}/comments",
+                       json={"body": "TEST_notif_comment", "anonymous": False}, headers=H2)
+    assert rc.status_code == 200
+    # User1 should now have a notification
+    rn = requests.get(f"{BASE}/notifications", headers=H)
+    assert rn.status_code == 200
+    d = rn.json()
+    assert d["unread"] >= 1
+    assert any(i.get("ref_id") == pid and i["kind"] == "health_reply" for i in d["items"])
+
+def test_notification_mark_read():
+    rn = requests.get(f"{BASE}/notifications", headers=H).json()
+    nid = next(i["id"] for i in rn["items"] if not i["read"])
+    r = requests.post(f"{BASE}/notifications/{nid}/read", headers=H)
+    assert r.status_code == 200
+    rn2 = requests.get(f"{BASE}/notifications", headers=H).json()
+    item = next(i for i in rn2["items"] if i["id"] == nid)
+    assert item["read"] is True
+
+def test_notification_read_all():
+    r = requests.post(f"{BASE}/notifications/read-all", headers=H)
+    assert r.status_code == 200
+    rn = requests.get(f"{BASE}/notifications", headers=H).json()
+    assert rn["unread"] == 0
+
+def test_notif_cleanup_post():
+    requests.delete(f"{BASE}/health/posts/{NOTIF['post_id']}", headers=H)

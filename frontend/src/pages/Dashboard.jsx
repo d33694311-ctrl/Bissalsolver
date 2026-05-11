@@ -1,10 +1,12 @@
 import React, { useEffect } from "react";
-import { Routes, Route, NavLink, useNavigate, Link } from "react-router-dom";
+import { Routes, Route, NavLink, useNavigate, Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import {
-  Recycle, Droplet, Calculator, Globe2, BookText, Users,
-  LogOut, LayoutGrid, BookOpen, Gavel, Pill, CloudSun,
+  Recycle, Calculator, Globe2, Users,
+  LogOut, LayoutGrid, BookOpen, Gavel, CloudSun, Heart, Leaf,
 } from "lucide-react";
+import ConsumptionExchange from "@/modules/ConsumptionExchange";
+import Wellness from "@/modules/Wellness";
 import WasteExchange from "@/modules/WasteExchange";
 import WaterTracker from "@/modules/WaterTracker";
 import TaxHelper from "@/modules/TaxHelper";
@@ -18,31 +20,17 @@ import Weather from "@/modules/Weather";
 import DashboardHome from "@/modules/DashboardHome";
 import NotificationBell from "@/components/NotificationBell";
 
-const navGroups = [
-  { label: "Overview", items: [{ to: "/dashboard", label: "Index", icon: LayoutGrid, end: true, key: "home" }] },
-  { label: "Consumption Exchange", items: [
-    { to: "/dashboard/waste", label: "Waste Exchange", icon: Recycle, key: "waste" },
-    { to: "/dashboard/water", label: "Water Tracker", icon: Droplet, key: "water" },
-  ]},
-  { label: "Finance", items: [
-    { to: "/dashboard/tax", label: "Tax Helper", icon: Calculator, key: "tax" },
-    { to: "/dashboard/currency", label: "Currency", icon: Globe2, key: "currency" },
-  ]},
-  { label: "Education", items: [
-    { to: "/dashboard/revision", label: "Revision", icon: BookOpen, key: "revision" },
-    { to: "/dashboard/amendments", label: "Amendments", icon: Gavel, key: "amendments" },
-  ]},
-  { label: "Wellness", items: [
-    { to: "/dashboard/medicines", label: "Medicines", icon: Pill, key: "medicines" },
-    { to: "/dashboard/journal", label: "Journal & Q&A", icon: BookText, key: "journal" },
-  ]},
-  { label: "Community", items: [
-    { to: "/dashboard/weather", label: "Weather", icon: CloudSun, key: "weather" },
-    { to: "/dashboard/skills", label: "Skill Swap", icon: Users, key: "skills" },
-  ]},
+const navItems = [
+  { to: "/dashboard", label: "Index", icon: LayoutGrid, end: true, key: "home" },
+  { to: "/dashboard/consumption-exchange", label: "Consumption Exchange", icon: Leaf, key: "consumption" },
+  { to: "/dashboard/tax", label: "Tax Helper", icon: Calculator, key: "tax" },
+  { to: "/dashboard/currency", label: "Currency", icon: Globe2, key: "currency" },
+  { to: "/dashboard/revision", label: "Revision", icon: BookOpen, key: "revision" },
+  { to: "/dashboard/amendments", label: "Amendments", icon: Gavel, key: "amendments" },
+  { to: "/dashboard/wellness", label: "Wellness", icon: Heart, key: "wellness" },
+  { to: "/dashboard/weather", label: "Weather", icon: CloudSun, key: "weather" },
+  { to: "/dashboard/skills", label: "Skill Swap", icon: Users, key: "skills" },
 ];
-
-const allMobileItems = navGroups.flatMap((g) => g.items);
 
 export default function Dashboard() {
   const { user, loading, logout } = useAuth();
@@ -68,27 +56,22 @@ export default function Dashboard() {
           <Link to="/" className="bissal-mark text-2xl block" data-testid="sidebar-brand">Bissal.</Link>
           <p className="font-mono-print text-[10px] tracking-widest-print uppercase mt-1 text-neutral-600">Problem Solver Hub</p>
         </div>
-        <nav className="flex-1 py-2">
-          {navGroups.map((g) => (
-            <div key={g.label} className="mb-2">
-              <p className="px-6 pt-3 pb-1 font-mono-print text-[10px] tracking-widest-print uppercase text-neutral-500">{g.label}</p>
-              {g.items.map((n) => (
-                <NavLink
-                  key={n.key}
-                  to={n.to}
-                  end={n.end}
-                  data-testid={`nav-${n.key}`}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-6 py-2 font-mono-print text-sm border-l-4 ${
-                      isActive ? "bg-black text-white border-[#FF3333]" : "border-transparent hover:bg-neutral-100"
-                    }`
-                  }
-                >
-                  <n.icon className="w-4 h-4" strokeWidth={1.5} />
-                  <span>{n.label}</span>
-                </NavLink>
-              ))}
-            </div>
+        <nav className="flex-1 py-3">
+          {navItems.map((n) => (
+            <NavLink
+              key={n.key}
+              to={n.to}
+              end={n.end}
+              data-testid={`nav-${n.key}`}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-mono-print text-sm border-l-4 ${
+                  isActive ? "bg-black text-white border-[#FF3333]" : "border-transparent hover:bg-neutral-100"
+                }`
+              }
+            >
+              <n.icon className="w-4 h-4" strokeWidth={1.5} />
+              <span>{n.label}</span>
+            </NavLink>
           ))}
         </nav>
         <div className="border-t border-black p-4">
@@ -127,12 +110,12 @@ export default function Dashboard() {
         {/* Desktop top-right bell */}
         <div className="hidden md:flex items-center justify-end gap-3 px-6 py-3 border-b border-black bg-white sticky top-0 z-20">
           <span className="font-mono-print text-xs uppercase tracking-widest-print text-neutral-600 hidden lg:inline">{new Date().toLocaleDateString("en-GB")}</span>
-          <NotificationBell />
+          <div data-testid="notification-bell-desktop-wrap"><NotificationBell /></div>
         </div>
 
         {/* Mobile nav strip */}
         <div className="md:hidden border-b border-black overflow-x-auto whitespace-nowrap">
-          {allMobileItems.map((n) => (
+          {navItems.map((n) => (
             <NavLink
               key={n.key}
               to={n.to}
@@ -150,6 +133,9 @@ export default function Dashboard() {
 
         <Routes>
           <Route index element={<DashboardHome />} />
+          <Route path="consumption-exchange" element={<ConsumptionExchange />} />
+          <Route path="wellness" element={<Wellness />} />
+          {/* Old direct routes still accessible */}
           <Route path="waste" element={<WasteExchange />} />
           <Route path="water" element={<WaterTracker />} />
           <Route path="tax" element={<TaxHelper />} />
@@ -160,9 +146,9 @@ export default function Dashboard() {
           <Route path="journal" element={<MentalJournal />} />
           <Route path="weather" element={<Weather />} />
           <Route path="skills" element={<SkillSwap />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
     </div>
   );
 }
-

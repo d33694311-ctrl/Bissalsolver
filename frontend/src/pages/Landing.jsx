@@ -2,17 +2,15 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { motion } from "framer-motion";
-import { ArrowRight, Recycle, Droplet, Calculator, Globe2, BookText, Users, Heart, BookOpen, Gavel, Pill, CloudSun } from "lucide-react";
+import { ArrowRight, Calculator, Globe2, Users, Heart, BookOpen, Gavel, CloudSun, Leaf } from "lucide-react";
 
 const modules = [
-  { icon: Recycle, name: "Waste Exchange", line: "Trade recyclables locally", stamp: "FRESH", stampClass: "green" },
-  { icon: Droplet, name: "Water Tracker", line: "Ledger your consumption", stamp: "DAILY", stampClass: "blue" },
+  { icon: Leaf, name: "Consumption Exchange", line: "Waste & water, one chapter", stamp: "GREEN", stampClass: "green" },
   { icon: Calculator, name: "Tax Helper", line: "Auto P&L for micro-business", stamp: "OFFICIAL", stampClass: "" },
   { icon: Globe2, name: "Currency + Logistics", line: "Real landed cost", stamp: "LIVE", stampClass: "" },
   { icon: BookOpen, name: "Revision", line: "AI summaries & flashcards", stamp: "STUDY", stampClass: "blue" },
   { icon: Gavel, name: "Amendment Wire", line: "RBI · SEBI · GST · IT · MCA", stamp: "LIVE", stampClass: "" },
-  { icon: Pill, name: "Medicine Finder", line: "Search by symptom, find cheaper", stamp: "CHEAP", stampClass: "green" },
-  { icon: BookText, name: "Mental Journal", line: "Typewriter quotes & community Q&A", stamp: "QUIET", stampClass: "green" },
+  { icon: Heart, name: "Wellness", line: "Medicines + journal & community", stamp: "CARE", stampClass: "green" },
   { icon: CloudSun, name: "Weather Hub", line: "Hyper-local + persona checklists", stamp: "TODAY", stampClass: "blue" },
   { icon: Users, name: "Skill Swap", line: "Trade time, not money", stamp: "OPEN", stampClass: "blue" },
 ];
@@ -111,7 +109,7 @@ export default function Landing() {
               Est. 2026 — A weekly broadside of practical instruments
             </p>
             <h1 className="font-typewriter text-5xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight">
-              <span className="marker-underline">Ten small instruments</span><br />
+              <span className="marker-underline">Eight small chapters</span><br />
               for <span className="text-[#FF3333]">ten</span> large problems.
             </h1>
             <p className="font-mono-print mt-8 max-w-xl text-base leading-relaxed">

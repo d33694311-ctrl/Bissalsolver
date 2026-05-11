@@ -117,7 +117,7 @@ export default function Dashboard() {
       <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-black z-30 flex items-center justify-between px-4 py-3">
         <Link to="/" className="bissal-mark text-xl">Bissal.</Link>
         <div className="flex items-center gap-2">
-          <NotificationBell />
+          <div data-testid="notification-bell-mobile-wrap"><NotificationBell /></div>
           <button onClick={logout} className="font-mono-print text-xs border border-black px-3 py-1" data-testid="mobile-logout">Out</button>
         </div>
       </div>
@@ -165,3 +165,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

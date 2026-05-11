@@ -11,14 +11,24 @@ Build "Problem Solver Hub" (branded **Bissal**) — multi-module website tacklin
 - Live currency: open.er-api.com (free, no key)
 - Exports: reportlab (PDF) + openpyxl (Excel)
 
-## Implemented Modules (6 — v1) + Community Health Q&A (v1.1)
-1. **Waste Exchange** — list/search recyclables, contact field, material filter
-2. **Water Tracker** — daily logs, chart with conservation benchmark, .xlsx export
-3. **Tax Helper** — income/expense ledger, auto P&L + estimated tax, PDF + Excel export
-4. **Currency + Logistics** — live rates + customs %, transport, fees → landed cost
-5. **Mental Journal** — mood log + Claude-typed motivational quote w/ typewriter animation, PDF export
-   - **NEW · Community Health Q&A** — public posts with anonymous toggle, threaded suggestions/comments, comment count, cascade-delete
-6. **Skill Swap** — listings, search, ratings (asterisks) + reviews
+## Implemented Modules (all 10) + Community Health Q&A + Notifications
+1. **Waste Exchange**
+2. **Water Tracker** (.xlsx export)
+3. **Tax Helper** (PDF + Excel)
+4. **Currency + Logistics**
+5. **Revision** — Claude summary + revision table + flashcards (PDF export, flip animation)
+6. **Amendment Wire** — live RBI · SEBI · GST · Income Tax · MCA · ICAI via Google News RSS + SEBI official RSS (30-min cache)
+7. **Medicine Finder** — live debounced search by symptom or name, sorted by price, generic + cheaper alternatives
+8. **Mental Journal** + **Community Health Q&A** (anonymous, threaded comments, owner-only delete cascade)
+9. **Weather Hub** — Open-Meteo, hyper-local 7-day, persona checklists (farmer / student / commuter)
+10. **Skill Swap** (ratings, reviews)
+
+**Real-time notifications**: in-app bell with 25s polling, badge with unread count, dropdown panel, "read all", deep-links into post on click. Triggered on Health Q&A replies (not self).
+
+## Deferred (P2)
+- Waste/Skill in-app DMs
+- Sticky-note color accents in modules
+- WebSocket-based push (replace polling)
 
 ## Liveliness upgrades (v1.1)
 - Animated typewriter SVG hero illustration (keys press, ribbon dashes scroll)
